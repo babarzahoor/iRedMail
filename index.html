@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FusionMail</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <button class="menu-btn" id="menuBtn">
+                    <span class="material-icons">menu</span>
+                </button>
+                <div class="logo">
+                    <span class="logo-text">FusionMail</span>
+                </div>
+            </div>
+            
+            <div class="header-center">
+                <div class="search-container">
+                    <span class="material-icons search-icon">search</span>
+                    <input type="text" placeholder="Search mail" class="search-input" id="searchInput">
+                    <button class="search-options-btn">
+                        <span class="material-icons">tune</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="header-right">
+                <button class="header-btn">
+                    <span class="material-icons">help_outline</span>
+                </button>
+                <button class="header-btn">
+                    <span class="material-icons">settings</span>
+                </button>
+                <button class="header-btn">
+                    <span class="material-icons">apps</span>
+                </button>
+                <div class="profile-avatar">
+                    <img src="https://via.placeholder.com/32x32/4285f4/ffffff?text=U" alt="Profile">
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <button class="compose-btn" id="composeBtn">
+                    <span class="material-icons">edit</span>
+                    <span>Compose</span>
+                </button>
+                
+                <nav class="sidebar-nav">
+                    <a href="#" class="nav-item active" data-folder="inbox">
+                        <span class="material-icons">inbox</span>
+                        <span>Inbox</span>
+                        <span class="count">3</span>
+                    </a>
+                    <a href="#" class="nav-item" data-folder="starred">
+                        <span class="material-icons">star</span>
+                        <span>Starred</span>
+                    </a>
+                    <a href="#" class="nav-item" data-folder="snoozed">
+                        <span class="material-icons">schedule</span>
+                        <span>Snoozed</span>
+                    </a>
+                    <a href="#" class="nav-item" data-folder="important">
+                        <span class="material-icons">label_important</span>
+                        <span>Important</span>
+                    </a>
+                    <a href="#" class="nav-item" data-folder="sent">
+                        <span class="material-icons">send</span>
+                        <span>Sent</span>
+                    </a>
+                    <a href="#" class="nav-item" data-folder="drafts">
+                        <span class="material-icons">drafts</span>
+                        <span>Drafts</span>
+                    </a>
+                    <a href="#" class="nav-item" data-folder="spam">
+                        <span class="material-icons">report</span>
+                        <span>Spam</span>
+                    </a>
+                    <a href="#" class="nav-item" data-folder="trash">
+                        <span class="material-icons">delete</span>
+                        <span>Trash</span>
+                    </a>
+                </nav>
+                
+                <div class="sidebar-section">
+                    <h3>Labels</h3>
+                    <div class="labels-list">
+                        <a href="#" class="label-item">
+                            <span class="label-color" style="background-color: #ff6b6b;"></span>
+                            <span>Work</span>
+                        </a>
+                        <a href="#" class="label-item">
+                            <span class="label-color" style="background-color: #4ecdc4;"></span>
+                            <span>Personal</span>
+                        </a>
+                        <a href="#" class="label-item">
+                            <span class="label-color" style="background-color: #45b7d1;"></span>
+                            <span>Travel</span>
+                        </a>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Email List -->
+            <main class="email-list-container" id="emailList">
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="selectAll">
+                            <span class="checkmark"></span>
+                        </label>
+                        <button class="toolbar-btn" title="Archive">
+                            <span class="material-icons">archive</span>
+                        </button>
+                        <button class="toolbar-btn" title="Delete">
+                            <span class="material-icons">delete</span>
+                        </button>
+                        <button class="toolbar-btn" title="Mark as spam">
+                            <span class="material-icons">report</span>
+                        </button>
+                        <button class="toolbar-btn" title="Mark as read">
+                            <span class="material-icons">mark_email_read</span>
+                        </button>
+                    </div>
+                    
+                    <div class="toolbar-right">
+                        <span class="email-count">1-50 of 1,234</span>
+                        <button class="toolbar-btn">
+                            <span class="material-icons">chevron_left</span>
+                        </button>
+                        <button class="toolbar-btn">
+                            <span class="material-icons">chevron_right</span>
+                        </button>
+                        <button class="toolbar-btn">
+                            <span class="material-icons">refresh</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="email-list" id="emailListContent">
+                    <!-- Email items will be populated by JavaScript -->
+                </div>
+            </main>
+
+            <!-- Email View -->
+            <div class="email-view" id="emailView" style="display: none;">
+                <div class="email-header">
+                    <button class="back-btn" id="backBtn">
+                        <span class="material-icons">arrow_back</span>
+                    </button>
+                    <div class="email-actions">
+                        <button class="action-btn" title="Archive">
+                            <span class="material-icons">archive</span>
+                        </button>
+                        <button class="action-btn" title="Delete">
+                            <span class="material-icons">delete</span>
+                        </button>
+                        <button class="action-btn" title="Mark as spam">
+                            <span class="material-icons">report</span>
+                        </button>
+                        <button class="action-btn" title="Star">
+                            <span class="material-icons">star_border</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="email-content" id="emailContent">
+                    <!-- Email content will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Compose Modal -->
+        <div class="compose-modal" id="composeModal">
+            <div class="compose-header">
+                <span>New Message</span>
+                <div class="compose-actions">
+                    <button class="compose-action-btn" title="Minimize">
+                        <span class="material-icons">minimize</span>
+                    </button>
+                    <button class="compose-action-btn" title="Close" id="closeCompose">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+            </div>
+            
+            <form class="compose-form" id="composeForm">
+                <div class="compose-field">
+                    <label>To</label>
+                    <input type="email" placeholder="Recipients" id="composeTo">
+                </div>
+                <div class="compose-field">
+                    <label>Cc</label>
+                    <input type="email" placeholder="Cc" id="composeCc">
+                </div>
+                <div class="compose-field">
+                    <label>Bcc</label>
+                    <input type="email" placeholder="Bcc" id="composeBcc">
+                </div>
+                <div class="compose-field">
+                    <label>Subject</label>
+                    <input type="text" placeholder="Subject" id="composeSubject">
+                </div>
+                <div class="compose-body">
+                    <textarea placeholder="Compose email" id="composeBody"></textarea>
+                </div>
+                <div class="compose-footer">
+                    <button type="submit" class="send-btn">
+                        <span class="material-icons">send</span>
+                        Send
+                    </button>
+                    <button type="button" class="compose-footer-btn" title="Attach files">
+                        <span class="material-icons">attach_file</span>
+                    </button>
+                    <button type="button" class="compose-footer-btn" title="Insert link">
+                        <span class="material-icons">link</span>
+                    </button>
+                    <button type="button" class="compose-footer-btn" title="Insert emoji">
+                        <span class="material-icons">sentiment_satisfied</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Overlay -->
+        <div class="overlay" id="overlay"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
