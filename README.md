@@ -46,11 +46,12 @@ cp api/.env.example api/.env
 Edit `api/.env` with your iRedMail configuration:
 ```env
 DB_HOST=your-iredmail-server
-DB_USER=vmail
-DB_PASSWORD=your-vmail-password
+DB_USER=vmailadmin
+DB_PASSWORD=your-vmailadmin-password
 DB_NAME=vmail
 SMTP_HOST=your-iredmail-server
 IMAP_HOST=your-iredmail-server
+STORAGE_BASE=/var/vmail/vmail1
 JWT_SECRET=your-secret-key
 ```
 
@@ -92,17 +93,27 @@ npm run dev    # Frontend (port 3000)
 This connector integrates with iRedMail's core components:
 
 ### Database Integration
-- **vmail.mailbox** - User authentication and account info
-- **Mail storage** - Maildir format support
-- **Folder structure** - IMAP folder mapping
+- **vmail.mailbox** - User authentication, account info, and maildir paths
+- **vmail.log** - Email activity logging
+- **Maildir format** - Direct maildir parsing for email content
+- **iRedMail folder structure** - Standard Dovecot folder layout
 
 ### SMTP Integration
 - **Postfix** - Email sending through iRedMail's SMTP server
-- **Authentication** - User credentials for SMTP auth
+- **SASL Authentication** - User credentials for SMTP auth
+- **TLS/STARTTLS** - Secure email transmission
 
-### IMAP Integration
-- **Dovecot** - Email retrieval and folder management
-- **Real-time sync** - Live email updates
+### Maildir Integration
+- **Direct Maildir Access** - Read emails directly from filesystem
+- **Folder Detection** - Automatic folder discovery
+- **Flag Support** - Read/unread, starred status from maildir flags
+
+### Password Schemes
+- **SSHA512** - Salted SHA-512 (iRedMail default)
+- **SSHA** - Salted SHA-1
+- **BCRYPT** - BCrypt hashing
+- **PLAIN/MD5** - Legacy support
+- **Doveadm Integration** - Use doveadm for password verification
 
 ## Security Features
 
@@ -140,10 +151,11 @@ To add new features:
 ### Database Schema
 
 The connector works with iRedMail's standard database schema:
-- `mailbox` - User accounts and settings
+- `mailbox` - User accounts, settings, and maildir paths
 - `domain` - Email domains
 - `alias` - Email aliases and forwarding
 - `forwardings` - Email forwarding rules
+- `log` - Activity logging
 
 ## Troubleshooting
 

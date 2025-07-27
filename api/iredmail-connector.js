@@ -1,9 +1,12 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
-const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 class IRedMailConnector {
     constructor(config) {
@@ -11,7 +14,7 @@ class IRedMailConnector {
             database: {
                 host: config.db_host || 'localhost',
                 port: config.db_port || 3306,
-                user: config.db_user || 'vmail',
+                user: config.db_user || 'vmailadmin',
                 password: config.db_password,
                 database: config.db_name || 'vmail'
             },
@@ -30,6 +33,13 @@ class IRedMailConnector {
                 secure: false
             },
             jwt_secret: config.jwt_secret || 'your-secret-key'
+        };
+        
+        // iRedMail specific paths
+        this.iredmail_paths = {
+            storage_base: config.storage_base || '/var/vmail/vmail1',
+            dovecot_deliver: config.dovecot_deliver || '/usr/libexec/dovecot/deliver',
+            postfix_queue: config.postfix_queue || '/var/spool/postfix'
         };
         
         this.app = express();
@@ -95,7 +105,7 @@ class IRedMailConnector {
             
             // Query user from iRedMail mailbox table
             const [rows] = await connection.execute(
-                'SELECT username, password, name, domain, active FROM mailbox WHERE username = ? AND active = 1',
+                'SELECT username, password, name, domain, active, enablesmtp, enableimap, enablepop3 FROM mailbox WHERE username = ? AND active = 1',
                 [email]
             );
             
@@ -106,6 +116,11 @@ class IRedMailConnector {
             }
             
             const user = rows[0];
+            
+            // Check if user has email services enabled
+            if (!user.enablesmtp || !user.enableimap) {
+                return res.status(401).json({ error: 'Email services not enabled for this account' });
+            }
             
             // Verify password (iRedMail uses various schemes, this is simplified)
             const isValidPassword = await this.verifyPassword(password, user.password);
@@ -141,27 +156,94 @@ class IRedMailConnector {
     }
     
     async verifyPassword(plainPassword, hashedPassword) {
-        // iRedMail supports multiple password schemes
-        // This is a simplified version - you may need to handle SSHA, SSHA512, etc.
+        // iRedMail password scheme verification
         try {
+            // Remove any leading/trailing whitespace
+            hashedPassword = hashedPassword.trim();
+            
             if (hashedPassword.startsWith('{SSHA512}')) {
-                // Handle SSHA512 scheme
-                const hash = hashedPassword.substring(9);
-                // Implement SSHA512 verification
-                return false; // Placeholder
+                return this.verifySSSHA512(plainPassword, hashedPassword);
             } else if (hashedPassword.startsWith('{SSHA}')) {
-                // Handle SSHA scheme
-                const hash = hashedPassword.substring(6);
-                // Implement SSHA verification
-                return false; // Placeholder
+                return this.verifySSHA(plainPassword, hashedPassword);
+            } else if (hashedPassword.startsWith('{PLAIN}')) {
+                return plainPassword === hashedPassword.substring(7);
+            } else if (hashedPassword.startsWith('{MD5}')) {
+                const hash = crypto.createHash('md5').update(plainPassword).digest('hex');
+                return hash === hashedPassword.substring(5);
+            } else if (hashedPassword.startsWith('$2b$') || hashedPassword.startsWith('$2a$')) {
+                // BCRYPT - use doveadm for verification
+                return this.verifyWithDoveadm(plainPassword, hashedPassword);
             } else {
-                // Fallback to bcrypt
-                return await bcrypt.compare(plainPassword, hashedPassword);
+                // Try as plain text or use doveadm
+                return this.verifyWithDoveadm(plainPassword, hashedPassword);
             }
         } catch (error) {
             console.error('Password verification error:', error);
             return false;
         }
+    }
+    
+    verifySSSHA512(plainPassword, hashedPassword) {
+        try {
+            const hash = hashedPassword.substring(9); // Remove {SSHA512}
+            const decoded = Buffer.from(hash, 'base64');
+            const salt = decoded.slice(64); // SHA512 produces 64 bytes
+            const storedHash = decoded.slice(0, 64);
+            
+            const computed = crypto.createHash('sha512').update(plainPassword + salt).digest();
+            return computed.equals(storedHash);
+        } catch (error) {
+            return false;
+        }
+    }
+    
+    verifySSHA(plainPassword, hashedPassword) {
+        try {
+            const hash = hashedPassword.substring(6); // Remove {SSHA}
+            const decoded = Buffer.from(hash, 'base64');
+            const salt = decoded.slice(20); // SHA1 produces 20 bytes
+            const storedHash = decoded.slice(0, 20);
+            
+            const computed = crypto.createHash('sha1').update(plainPassword + salt).digest();
+            return computed.equals(storedHash);
+        } catch (error) {
+            return false;
+        }
+    }
+    
+    verifyWithDoveadm(plainPassword, hashedPassword) {
+        try {
+            // Use doveadm to verify password (requires doveadm to be installed)
+            const result = execSync(`echo "${plainPassword}" | doveadm pw -t "${hashedPassword}"`, 
+                { encoding: 'utf8', timeout: 5000 });
+            return result.trim() === hashedPassword;
+        } catch (error) {
+            // Fallback: try direct comparison for plain passwords
+            return plainPassword === hashedPassword;
+        }
+    }
+    
+    async getMaildirPath(username) {
+        // Get maildir path from database
+        const connection = await this.getDbConnection();
+        const [rows] = await connection.execute(
+            'SELECT storagebasedirectory, storagenode, maildir FROM mailbox WHERE username = ?',
+            [username]
+        );
+        await connection.end();
+        
+        if (rows.length === 0) {
+            throw new Error('User maildir not found');
+        }
+        
+        const user = rows[0];
+        const maildirPath = path.join(
+            user.storagebasedirectory || this.iredmail_paths.storage_base,
+            user.storagenode || '',
+            user.maildir || ''
+        );
+        
+        return maildirPath;
     }
     
     async logout(req, res) {
@@ -191,23 +273,94 @@ class IRedMailConnector {
     }
     
     async fetchEmailsFromMaildir(username, folder, limit, offset) {
-        // Placeholder implementation
-        // In a real scenario, you'd parse the maildir structure
-        // or use an IMAP library to fetch emails
-        
-        return [
-            {
-                id: 1,
-                sender: 'System Admin',
-                email: 'admin@' + req.user.domain,
-                subject: 'Welcome to iRedMail',
-                snippet: 'Your email account has been successfully configured.',
-                date: new Date().toISOString(),
-                unread: true,
-                starred: false,
-                folder: 'INBOX'
+        try {
+            const maildirPath = await this.getMaildirPath(username);
+            const folderPath = path.join(maildirPath, 'Maildir', folder === 'INBOX' ? '' : `.${folder}`, 'cur');
+            
+            if (!fs.existsSync(folderPath)) {
+                return [];
             }
-        ];
+            
+            const files = fs.readdirSync(folderPath)
+                .filter(file => file.includes(':'))
+                .sort((a, b) => {
+                    const statA = fs.statSync(path.join(folderPath, a));
+                    const statB = fs.statSync(path.join(folderPath, b));
+                    return statB.mtime - statA.mtime;
+                })
+                .slice(offset, offset + limit);
+            
+            const emails = [];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const filePath = path.join(folderPath, file);
+                const content = fs.readFileSync(filePath, 'utf8');
+                
+                // Parse email headers
+                const email = this.parseEmailHeaders(content, i + 1);
+                email.unread = !file.includes('S'); // 'S' flag means seen
+                email.starred = file.includes('F'); // 'F' flag means flagged
+                email.folder = folder.toLowerCase();
+                
+                emails.push(email);
+            }
+            
+            return emails;
+        } catch (error) {
+            console.error('Error fetching emails from maildir:', error);
+            return [];
+        }
+    }
+    
+    parseEmailHeaders(content, id) {
+        const lines = content.split('\n');
+        let sender = 'Unknown';
+        let subject = 'No Subject';
+        let date = new Date();
+        let body = '';
+        
+        let inHeaders = true;
+        let bodyLines = [];
+        
+        for (const line of lines) {
+            if (inHeaders) {
+                if (line.trim() === '') {
+                    inHeaders = false;
+                    continue;
+                }
+                
+                if (line.toLowerCase().startsWith('from:')) {
+                    sender = line.substring(5).trim().replace(/[<>]/g, '');
+                } else if (line.toLowerCase().startsWith('subject:')) {
+                    subject = line.substring(8).trim();
+                } else if (line.toLowerCase().startsWith('date:')) {
+                    try {
+                        date = new Date(line.substring(5).trim());
+                    } catch (e) {
+                        date = new Date();
+                    }
+                }
+            } else {
+                bodyLines.push(line);
+            }
+        }
+        
+        body = bodyLines.join('\n').trim();
+        const snippet = body.substring(0, 100).replace(/\s+/g, ' ');
+        
+        return {
+            id: id,
+            sender: sender.split('<')[0].trim() || sender,
+            email: sender.includes('<') ? sender.split('<')[1].replace('>', '') : sender,
+            subject: subject,
+            snippet: snippet,
+            date: date.toISOString(),
+            body: body,
+            labels: [],
+            unread: false,
+            starred: false,
+            folder: 'inbox'
+        };
     }
     
     async getEmail(req, res) {
@@ -254,14 +407,18 @@ class IRedMailConnector {
                 return res.status(400).json({ error: 'To and subject are required' });
             }
             
-            // Create SMTP transporter
+            // Use iRedMail's SMTP with proper authentication
             const transporter = nodemailer.createTransporter({
                 host: this.config.smtp.host,
                 port: this.config.smtp.port,
-                secure: this.config.smtp.secure,
+                secure: false, // Use STARTTLS
+                requireTLS: true,
                 auth: {
                     user: from,
-                    pass: req.headers['x-email-password'] // Pass through user's password
+                    pass: req.headers['x-email-password'] || this.config.smtp.auth.pass
+                },
+                tls: {
+                    rejectUnauthorized: false // For self-signed certificates
                 }
             });
             
@@ -275,6 +432,19 @@ class IRedMailConnector {
                 text: body,
                 html: body.replace(/\n/g, '<br>')
             });
+            
+            // Log to iRedMail if possible
+            try {
+                const connection = await this.getDbConnection();
+                await connection.execute(
+                    'INSERT INTO log (event, loglevel, msg, admin, ip, timestamp) VALUES (?, ?, ?, ?, ?, NOW())',
+                    ['email_sent', 'info', `Email sent from ${from} to ${to}`, from, req.ip || '127.0.0.1']
+                );
+                await connection.end();
+            } catch (logError) {
+                // Log error is not critical
+                console.warn('Failed to log email send event:', logError);
+            }
             
             res.json({
                 message: 'Email sent successfully',
@@ -361,14 +531,65 @@ class IRedMailConnector {
     }
     
     async getUserFolders(username) {
-        // Standard IMAP folders
-        return [
-            { name: 'INBOX', displayName: 'Inbox', count: 5 },
-            { name: 'Sent', displayName: 'Sent', count: 0 },
-            { name: 'Drafts', displayName: 'Drafts', count: 0 },
-            { name: 'Trash', displayName: 'Trash', count: 0 },
-            { name: 'Junk', displayName: 'Spam', count: 0 }
-        ];
+        try {
+            const maildirPath = await this.getMaildirPath(username);
+            const maildirRoot = path.join(maildirPath, 'Maildir');
+            
+            const folders = [
+                { name: 'INBOX', displayName: 'Inbox', count: 0 }
+            ];
+            
+            if (fs.existsSync(maildirRoot)) {
+                const items = fs.readdirSync(maildirRoot);
+                
+                for (const item of items) {
+                    if (item.startsWith('.') && fs.statSync(path.join(maildirRoot, item)).isDirectory()) {
+                        const folderName = item.substring(1); // Remove leading dot
+                        const curPath = path.join(maildirRoot, item, 'cur');
+                        
+                        let count = 0;
+                        if (fs.existsSync(curPath)) {
+                            const files = fs.readdirSync(curPath);
+                            count = files.filter(file => !file.includes('S')).length; // Unread count
+                        }
+                        
+                        folders.push({
+                            name: folderName,
+                            displayName: this.getFolderDisplayName(folderName),
+                            count: count
+                        });
+                    }
+                }
+            }
+            
+            return folders;
+        } catch (error) {
+            console.error('Error getting user folders:', error);
+            // Return default folders if maildir access fails
+            return [
+                { name: 'INBOX', displayName: 'Inbox', count: 0 },
+                { name: 'Sent', displayName: 'Sent', count: 0 },
+                { name: 'Drafts', displayName: 'Drafts', count: 0 },
+                { name: 'Trash', displayName: 'Trash', count: 0 },
+                { name: 'Junk', displayName: 'Spam', count: 0 }
+            ];
+        }
+    }
+    
+    getFolderDisplayName(folderName) {
+        const displayNames = {
+            'Sent': 'Sent',
+            'Drafts': 'Drafts', 
+            'Trash': 'Trash',
+            'Junk': 'Spam',
+            'Spam': 'Spam',
+            'INBOX.Sent': 'Sent',
+            'INBOX.Drafts': 'Drafts',
+            'INBOX.Trash': 'Trash',
+            'INBOX.Junk': 'Spam'
+        };
+        
+        return displayNames[folderName] || folderName;
     }
     
     async getUserInfo(req, res) {
@@ -377,7 +598,7 @@ class IRedMailConnector {
             const connection = await this.getDbConnection();
             
             const [rows] = await connection.execute(
-                'SELECT username, name, domain, quota, created FROM mailbox WHERE username = ?',
+                'SELECT username, name, domain, quota, created, storagebasedirectory, storagenode FROM mailbox WHERE username = ?',
                 [username]
             );
             
@@ -393,7 +614,11 @@ class IRedMailConnector {
                 name: user.name,
                 domain: user.domain,
                 quota: user.quota,
-                created: user.created
+                created: user.created,
+                storage_info: {
+                    base: user.storagebasedirectory,
+                    node: user.storagenode
+                }
             });
             
         } catch (error) {
