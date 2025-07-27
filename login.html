@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FusionMail - Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            padding: 48px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        .logo {
+            margin-bottom: 32px;
+        }
+        
+        .logo-text {
+            font-size: 32px;
+            font-weight: 400;
+            color: #1a73e8;
+            margin-bottom: 8px;
+        }
+        
+        .logo-subtitle {
+            font-size: 16px;
+            color: #5f6368;
+        }
+        
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        
+        .form-group {
+            text-align: left;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 8px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e8eaed;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+            outline: none;
+        }
+        
+        .form-group input:focus {
+            border-color: #1a73e8;
+        }
+        
+        .login-btn {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .login-btn:hover {
+            background: #1557b0;
+        }
+        
+        .login-btn:disabled {
+            background: #dadce0;
+            cursor: not-allowed;
+        }
+        
+        .error-message {
+            background: #fce8e6;
+            color: #d93025;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-top: 16px;
+            display: none;
+        }
+        
+        .loading {
+            display: none;
+        }
+        
+        .server-config {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #e8eaed;
+        }
+        
+        .server-config h3 {
+            font-size: 14px;
+            color: #5f6368;
+            margin-bottom: 12px;
+        }
+        
+        .server-config input {
+            font-size: 14px;
+            padding: 8px 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <div class="logo-text">FusionMail</div>
+            <div class="logo-subtitle">Powered by iRedMail</div>
+        </div>
+        
+        <form class="login-form" id="loginForm">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required placeholder="user@example.com">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required placeholder="Enter your password">
+            </div>
+            
+            <button type="submit" class="login-btn" id="loginBtn">
+                <span class="login-text">Sign In</span>
+                <span class="material-icons loading">hourglass_empty</span>
+            </button>
+            
+            <div class="error-message" id="errorMessage"></div>
+        </form>
+        
+        <div class="server-config">
+            <h3>Server Configuration</h3>
+            <div class="form-group">
+                <label for="apiUrl">API URL</label>
+                <input type="url" id="apiUrl" value="http://localhost:3001/api" placeholder="http://localhost:3001/api">
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/iredmail-client.js"></script>
+    <script>
+        class LoginManager {
+            constructor() {
+                this.client = null;
+                this.init();
+            }
+            
+            init() {
+                this.bindEvents();
+                this.checkExistingAuth();
+            }
+            
+            bindEvents() {
+                document.getElementById('loginForm').addEventListener('submit', (e) => {
+                    this.handleLogin(e);
+                });
+                
+                document.getElementById('apiUrl').addEventListener('change', (e) => {
+                    this.updateApiUrl(e.target.value);
+                });
+            }
+            
+            updateApiUrl(url) {
+                this.client = new IRedMailClient(url);
+                localStorage.setItem('fusionmail_api_url', url);
+            }
+            
+            checkExistingAuth() {
+                const apiUrl = localStorage.getItem('fusionmail_api_url') || 'http://localhost:3001/api';
+                document.getElementById('apiUrl').value = apiUrl;
+                
+                this.client = new IRedMailClient(apiUrl);
+                
+                if (this.client.isAuthenticated()) {
+                    this.redirectToApp();
+                }
+            }
+            
+            async handleLogin(e) {
+                e.preventDefault();
+                
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const loginBtn = document.getElementById('loginBtn');
+                const errorMessage = document.getElementById('errorMessage');
+                
+                // Show loading state
+                this.setLoading(true);
+                errorMessage.style.display = 'none';
+                
+                try {
+                    await this.client.login(email, password);
+                    this.redirectToApp();
+                } catch (error) {
+                    this.showError(error.message);
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+            
+            setLoading(loading) {
+                const loginBtn = document.getElementById('loginBtn');
+                const loginText = loginBtn.querySelector('.login-text');
+                const loadingIcon = loginBtn.querySelector('.loading');
+                
+                if (loading) {
+                    loginBtn.disabled = true;
+                    loginText.style.display = 'none';
+                    loadingIcon.style.display = 'block';
+                } else {
+                    loginBtn.disabled = false;
+                    loginText.style.display = 'block';
+                    loadingIcon.style.display = 'none';
+                }
+            }
+            
+            showError(message) {
+                const errorMessage = document.getElementById('errorMessage');
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+            }
+            
+            redirectToApp() {
+                window.location.href = 'index.html';
+            }
+        }
+        
+        // Initialize login manager
+        new LoginManager();
+    </script>
+</body>
+</html>
