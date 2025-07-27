@@ -1,0 +1,17 @@
+{
+  "name": "fusionmail",
+  "version": "1.0.0",
+  "description": "Google-style email web client",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve -s . -l 3000",
+    "start": "npx serve -s . -l 3000",
+    "build": "echo 'No build process needed for static site'"
+  },
+  "keywords": ["email", "webmail", "client"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.1"
+  }
+}
