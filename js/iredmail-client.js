@@ -1,13 +1,28 @@
 // iRedMail API Client for FusionMail
 class IRedMailClient {
-    constructor(apiBaseUrl = 'http://localhost:3001/api') {
+    constructor(apiBaseUrl = 'http://localhost:3001/api', demoMode = false) {
         this.apiBaseUrl = apiBaseUrl;
+        this.demoMode = demoMode;
         this.token = localStorage.getItem('fusionmail_token');
         this.user = JSON.parse(localStorage.getItem('fusionmail_user') || 'null');
+        
+        // Initialize demo provider if in demo mode
+        if (this.demoMode) {
+            this.demoProvider = new DemoDataProvider();
+        }
     }
     
     // Authentication methods
     async login(email, password) {
+        if (this.demoMode) {
+            const data = await this.demoProvider.login(email, password);
+            this.token = data.token;
+            this.user = data.user;
+            localStorage.setItem('fusionmail_token', this.token);
+            localStorage.setItem('fusionmail_user', JSON.stringify(this.user));
+            return data;
+        }
+        
         try {
             const response = await fetch(`${this.apiBaseUrl}/auth/login`, {
                 method: 'POST',
@@ -68,6 +83,10 @@ class IRedMailClient {
     
     // Email methods
     async getEmails(folder = 'INBOX', limit = 50, offset = 0) {
+        if (this.demoMode) {
+            return await this.demoProvider.getEmails(folder.toLowerCase(), limit, offset);
+        }
+        
         try {
             const params = new URLSearchParams({
                 folder,
@@ -91,6 +110,10 @@ class IRedMailClient {
     }
     
     async getEmail(emailId) {
+        if (this.demoMode) {
+            return await this.demoProvider.getEmail(emailId);
+        }
+        
         try {
             const response = await fetch(`${this.apiBaseUrl}/protected/emails/${emailId}`, {
                 headers: this.getAuthHeaders()
@@ -108,6 +131,10 @@ class IRedMailClient {
     }
     
     async sendEmail(emailData) {
+        if (this.demoMode) {
+            return await this.demoProvider.sendEmail(emailData);
+        }
+        
         try {
             const response = await fetch(`${this.apiBaseUrl}/protected/emails/send`, {
                 method: 'POST',
@@ -128,6 +155,10 @@ class IRedMailClient {
     }
     
     async markAsRead(emailId) {
+        if (this.demoMode) {
+            return await this.demoProvider.markAsRead(emailId);
+        }
+        
         try {
             const response = await fetch(`${this.apiBaseUrl}/protected/emails/${emailId}/read`, {
                 method: 'PUT',
@@ -146,6 +177,10 @@ class IRedMailClient {
     }
     
     async toggleStar(emailId, starred) {
+        if (this.demoMode) {
+            return await this.demoProvider.toggleStar(emailId, starred);
+        }
+        
         try {
             const response = await fetch(`${this.apiBaseUrl}/protected/emails/${emailId}/star`, {
                 method: 'PUT',
@@ -165,6 +200,10 @@ class IRedMailClient {
     }
     
     async deleteEmail(emailId) {
+        if (this.demoMode) {
+            return await this.demoProvider.deleteEmail(emailId);
+        }
+        
         try {
             const response = await fetch(`${this.apiBaseUrl}/protected/emails/${emailId}`, {
                 method: 'DELETE',
@@ -183,6 +222,10 @@ class IRedMailClient {
     }
     
     async getFolders() {
+        if (this.demoMode) {
+            return await this.demoProvider.getFolders();
+        }
+        
         try {
             const response = await fetch(`${this.apiBaseUrl}/protected/folders`, {
                 headers: this.getAuthHeaders()
@@ -200,6 +243,10 @@ class IRedMailClient {
     }
     
     async getUserInfo() {
+        if (this.demoMode) {
+            return await this.demoProvider.getUserInfo();
+        }
+        
         try {
             const response = await fetch(`${this.apiBaseUrl}/protected/user/info`, {
                 headers: this.getAuthHeaders()

@@ -2,7 +2,8 @@
 
 class FusionMail {
     constructor() {
-        this.client = new IRedMailClient();
+        // Enable demo mode when no iRedMail server is available
+        this.client = new IRedMailClient('http://localhost:3001/api', true);
         this.currentFolder = 'inbox';
         this.selectedEmails = new Set();
         this.emails = [];
@@ -12,8 +13,16 @@ class FusionMail {
     }
     
     async init() {
-        // Check authentication
-        if (!this.client.isAuthenticated()) {
+        // In demo mode, auto-login for development
+        if (this.client.demoMode && !this.client.isAuthenticated()) {
+            try {
+                await this.client.login('demo@fusionmail.com', 'demo123');
+            } catch (error) {
+                console.error('Demo login failed:', error);
+                window.location.href = 'login.html';
+                return;
+            }
+        } else if (!this.client.isAuthenticated()) {
             window.location.href = 'login.html';
             return;
         }

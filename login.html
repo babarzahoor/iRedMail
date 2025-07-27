@@ -146,6 +146,10 @@
         </div>
         
         <form class="login-form" id="loginForm">
+            <div class="demo-notice" style="background: #e8f0fe; color: #1a73e8; padding: 12px; border-radius: 8px; font-size: 14px; margin-bottom: 16px;">
+                <strong>Demo Mode:</strong> Use any email/password to login (e.g., demo@fusionmail.com / demo123)
+            </div>
+            
             <div class="form-group">
                 <label for="email">Email Address</label>
                 <input type="email" id="email" name="email" required placeholder="user@example.com">
@@ -197,7 +201,7 @@
             }
             
             updateApiUrl(url) {
-                this.client = new IRedMailClient(url);
+                this.client = new IRedMailClient(url, true);
                 localStorage.setItem('fusionmail_api_url', url);
             }
             
@@ -205,7 +209,8 @@
                 const apiUrl = localStorage.getItem('fusionmail_api_url') || 'http://localhost:3001/api';
                 document.getElementById('apiUrl').value = apiUrl;
                 
-                this.client = new IRedMailClient(apiUrl);
+                // Enable demo mode for development
+                this.client = new IRedMailClient(apiUrl, true);
                 
                 if (this.client.isAuthenticated()) {
                     this.redirectToApp();
