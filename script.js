@@ -226,7 +226,11 @@ class FusionMail {
         try {
             // Fetch full email content from API
             const email = await this.client.getEmail(emailId);
-            if (!email) return;
+            if (!email || !email.email) {
+                console.error('Email data is incomplete:', email);
+                this.showNotification('Failed to load email content');
+                return;
+            }
         
             this.currentEmail = email;
         
